@@ -16,6 +16,247 @@ console.log("Using NICE DCV Web Client SDK version " + dcv.version.versionStr);
 // Show launch button on page load
 document.addEventListener('DOMContentLoaded', showLaunchPrompt);
 
+// -----------------------------------------------------------------
+// MEDIA PERMISSIONS COMPONENT
+// -----------------------------------------------------------------
+
+function createMediaPermissionsComponent() {
+    const container = document.createElement('div');
+    container.style.cssText = 'margin: 25px 0; padding: 20px; background: #f9f9f9; border-radius: 8px;';
+    
+    const title = document.createElement('h3');
+    title.textContent = 'Media Permissions';
+    title.style.cssText = 'margin: 0 0 15px 0; color: #333; font-size: 18px; font-weight: 500;';
+    container.appendChild(title);
+    
+    // Status indicators
+    const statusContainer = document.createElement('div');
+    statusContainer.style.cssText = 'margin: 15px 0; display: flex; flex-direction: column; gap: 12px;';
+    
+    const webcamStatus = document.createElement('div');
+    webcamStatus.id = 'pre-webcam-status';
+    webcamStatus.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd;';
+    
+    const micStatus = document.createElement('div');
+    micStatus.id = 'pre-mic-status';
+    micStatus.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd;';
+    
+    // Webcam status
+    const webcamLabel = document.createElement('span');
+    webcamLabel.textContent = 'Webcam:';
+    webcamLabel.style.cssText = 'font-weight: 500; color: #333;';
+    
+    const webcamIndicator = document.createElement('span');
+    webcamIndicator.id = 'pre-webcam-indicator';
+    webcamIndicator.textContent = 'Not Enabled';
+    webcamIndicator.style.cssText = 'color: #d9534f; font-weight: bold;';
+    
+    webcamStatus.appendChild(webcamLabel);
+    webcamStatus.appendChild(webcamIndicator);
+    
+    // Mic status
+    const micLabel = document.createElement('span');
+    micLabel.textContent = 'Microphone:';
+    micLabel.style.cssText = 'font-weight: 500; color: #333;';
+    
+    const micIndicator = document.createElement('span');
+    micIndicator.id = 'pre-mic-indicator';
+    micIndicator.textContent = 'Not Enabled';
+    micIndicator.style.cssText = 'color: #d9534f; font-weight: bold;';
+    
+    micStatus.appendChild(micLabel);
+    micStatus.appendChild(micIndicator);
+    
+    statusContainer.appendChild(webcamStatus);
+    statusContainer.appendChild(micStatus);
+    
+    // Buttons container
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.cssText = 'display: flex; gap: 10px; justify-content: center; margin-top: 15px;';
+    
+    const enableWebcamBtn = document.createElement('button');
+    enableWebcamBtn.id = 'pre-enable-webcam';
+    enableWebcamBtn.textContent = 'Enable Webcam';
+    enableWebcamBtn.style.cssText = `
+        padding: 10px 20px;
+        font-size: 14px;
+        background: #5cb85c;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+    `;
+    enableWebcamBtn.onmouseover = () => {
+        if (!enableWebcamBtn.disabled) {
+            enableWebcamBtn.style.background = '#4cae4c';
+        }
+    };
+    enableWebcamBtn.onmouseout = () => {
+        if (!enableWebcamBtn.disabled) {
+            enableWebcamBtn.style.background = '#5cb85c';
+        }
+    };
+    
+    const enableMicBtn = document.createElement('button');
+    enableMicBtn.id = 'pre-enable-mic';
+    enableMicBtn.textContent = 'Enable Microphone';
+    enableMicBtn.style.cssText = `
+        padding: 10px 20px;
+        font-size: 14px;
+        background: #5cb85c;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+    `;
+    enableMicBtn.onmouseover = () => {
+        if (!enableMicBtn.disabled) {
+            enableMicBtn.style.background = '#4cae4c';
+        }
+    };
+    enableMicBtn.onmouseout = () => {
+        if (!enableMicBtn.disabled) {
+            enableMicBtn.style.background = '#5cb85c';
+        }
+    };
+    
+    buttonsContainer.appendChild(enableWebcamBtn);
+    buttonsContainer.appendChild(enableMicBtn);
+    
+    container.appendChild(statusContainer);
+    container.appendChild(buttonsContainer);
+    
+    // State tracking
+    let webcamEnabled = false;
+    let micEnabled = false;
+    let webcamStream = null;
+    let micStream = null;
+    let onStatusChangeCallback = null;
+    
+    function updateStatusCallback() {
+        if (onStatusChangeCallback) {
+            onStatusChangeCallback();
+        }
+    }
+    
+    function verifyWebcam(stream) {
+        const videoTracks = stream.getVideoTracks();
+        if (videoTracks.length > 0 && videoTracks[0].readyState === 'live') {
+            webcamEnabled = true;
+            webcamIndicator.textContent = 'Enabled';
+            webcamIndicator.style.color = '#5cb85c';
+            enableWebcamBtn.textContent = 'Webcam Enabled';
+            enableWebcamBtn.disabled = true;
+            enableWebcamBtn.style.background = '#5cb85c';
+            updateStatusCallback();
+            return true;
+        }
+        return false;
+    }
+    
+    function verifyMicrophone(stream) {
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length > 0 && audioTracks[0].readyState === 'live') {
+            micEnabled = true;
+            micIndicator.textContent = 'Enabled';
+            micIndicator.style.color = '#5cb85c';
+            enableMicBtn.textContent = 'Microphone Enabled';
+            enableMicBtn.disabled = true;
+            enableMicBtn.style.background = '#5cb85c';
+            updateStatusCallback();
+            return true;
+        }
+        return false;
+    }
+    
+    // Enable webcam handler
+    enableWebcamBtn.onclick = async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        enableWebcamBtn.disabled = true;
+        enableWebcamBtn.textContent = 'Enabling...';
+        webcamIndicator.textContent = 'Enabling...';
+        webcamIndicator.style.color = '#ffa500';
+        
+        try {
+            // Stop existing stream if any
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Request webcam permission
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            webcamStream = stream;
+            
+            if (verifyWebcam(stream)) {
+                // Stop the stream after verification to free resources
+                // The permission is now granted, DCV will use it when connecting
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    webcamStream = null;
+                }, 1000);
+            } else {
+                throw new Error('Webcam track not available');
+            }
+        } catch (e) {
+            console.error("Failed to enable webcam:", e.message);
+            enableWebcamBtn.disabled = false;
+            enableWebcamBtn.textContent = 'Enable Webcam';
+            webcamIndicator.textContent = 'Not Enabled';
+            webcamIndicator.style.color = '#d9534f';
+            alert('Failed to enable webcam. Please check your browser permissions and ensure a webcam is connected.');
+        }
+    };
+    
+    // Enable mic handler
+    enableMicBtn.onclick = async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        enableMicBtn.disabled = true;
+        enableMicBtn.textContent = 'Enabling...';
+        micIndicator.textContent = 'Enabling...';
+        micIndicator.style.color = '#ffa500';
+        
+        try {
+            // Stop existing stream if any
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Request microphone permission
+            const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            micStream = stream;
+            
+            if (verifyMicrophone(stream)) {
+                // Stop the stream after verification to free resources
+                // The permission is now granted, DCV will use it when connecting
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    micStream = null;
+                }, 1000);
+            } else {
+                throw new Error('Microphone track not available');
+            }
+        } catch (e) {
+            console.error("Failed to enable microphone:", e.message);
+            enableMicBtn.disabled = false;
+            enableMicBtn.textContent = 'Enable Microphone';
+            micIndicator.textContent = 'Not Enabled';
+            micIndicator.style.color = '#d9534f';
+            alert('Failed to enable microphone. Please check your browser permissions and ensure a microphone is connected.');
+        }
+    };
+    
+    return {
+        container,
+        get webcamEnabled() { return webcamEnabled; },
+        get micEnabled() { return micEnabled; },
+        set onStatusChange(callback) { onStatusChangeCallback = callback; }
+    };
+}
+
 function showLaunchPrompt () {
     // Create container for the selection UI
     const container = document.createElement('div');
@@ -70,14 +311,42 @@ function showLaunchPrompt () {
     
     container.appendChild(radioContainer);
     
+    // Create media permissions component
+    const mediaPermissionsComponent = createMediaPermissionsComponent();
+    container.appendChild(mediaPermissionsComponent.container);
+    
     // Launch button
     const button = document.createElement('button');
+    button.id = 'launch-dcv-button';
     button.textContent = 'Launch DCV in Fullscreen';
-    button.style.cssText = 'padding: 12px 30px; font-size: 18px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-weight: bold; width: 100%;';
-    button.onmouseover = () => button.style.background = '#45a049';
-    button.onmouseout = () => button.style.background = '#4CAF50';
+    button.disabled = true;
+    button.style.cssText = 'padding: 12px 30px; font-size: 18px; background: #cccccc; color: white; border: none; border-radius: 8px; cursor: not-allowed; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-weight: bold; width: 100%; opacity: 0.6;';
+    
+    // Update button state based on media permissions
+    const updateLaunchButton = () => {
+        if (mediaPermissionsComponent.webcamEnabled && mediaPermissionsComponent.micEnabled) {
+            button.disabled = false;
+            button.style.background = '#4CAF50';
+            button.style.cursor = 'pointer';
+            button.style.opacity = '1';
+            button.onmouseover = () => button.style.background = '#45a049';
+            button.onmouseout = () => button.style.background = '#4CAF50';
+        } else {
+            button.disabled = true;
+            button.style.background = '#cccccc';
+            button.style.cursor = 'not-allowed';
+            button.style.opacity = '0.6';
+            button.onmouseover = null;
+            button.onmouseout = null;
+        }
+    };
+    
+    // Set up callback to update button when media status changes
+    mediaPermissionsComponent.onStatusChange = updateLaunchButton;
     
     button.onclick = () => {
+        if (button.disabled) return;
+        
         // Get selected role
         const selectedRole = document.querySelector('input[name="role"]:checked').value;
         selectedConfig = selectedRole === 'teacher' ? CONFIGTEACHER : CONFIGSTUDENT;
@@ -175,41 +444,37 @@ function connect(sessionId, authToken) {
                 console.log("First frame received");
                 removeLoadingMessage();
                 updateDcvResolution();
-                // Show modal after first frame is rendered - ensures everything is ready
-                if (connection && connection._showModal) {
-                    // Small delay to ensure rendering is complete
-                    setTimeout(() => {
-                        connection._showModal();
-                    }, 100);
-                }
             }
         }
     }).then(conn => {
         console.log("Connection established!");
         connection = conn;
 
-        // Store the modalShown flag and timeout on connection object
-        connection._modalShown = false;
+        // Create media buttons and set them up immediately so they're always functional
+        createMediaButtons();
+        setupWebcamButton(connection, false);
+        setupMicButton(connection, false);
         
-        // Fallback: show modal after 2 seconds if firstFrame hasn't fired yet
-        connection._fallbackTimeout = setTimeout(() => {
-            if (!connection._modalShown && connection) {
-                console.log("Showing modal via fallback timeout");
-                showMediaPermissionsModal(connection);
-                connection._modalShown = true;
-            }
-        }, 2000);
-
-        // Method to show modal (prevents duplicate shows)
-        connection._showModal = () => {
-            if (!connection._modalShown) {
-                if (connection._fallbackTimeout) {
-                    clearTimeout(connection._fallbackTimeout);
-                }
-                showMediaPermissionsModal(connection);
-                connection._modalShown = true;
-            }
-        };
+        // Enable webcam and microphone since permissions were already granted
+        connection.setWebcam(true)
+            .then(() => {
+                console.log("Webcam enabled in DCV");
+                // Update button to reflect enabled state
+                setupWebcamButton(connection, true);
+            })
+            .catch(e => {
+                console.error("Failed to enable webcam in DCV:", e.message);
+            });
+        
+        connection.setMicrophone(true)
+            .then(() => {
+                console.log("Microphone enabled in DCV");
+                // Update button to reflect enabled state
+                setupMicButton(connection, true);
+            })
+            .catch(e => {
+                console.error("Failed to enable microphone in DCV:", e.message);
+            });
 
         window.addEventListener('resize', updateDcvResolution);
         ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'msfullscreenchange'].forEach(
@@ -281,277 +546,6 @@ function onPromptCredentials(authObj, credentialsChallenge) {
         createLoginForm();
         credentialsChallenge.requiredCredentials.forEach(challenge => addInput(challenge.name));
     }
-}
-
-// -----------------------------------------------------------------
-// MEDIA PERMISSIONS MODAL
-// -----------------------------------------------------------------
-
-function showMediaPermissionsModal(connection) {
-    // Remove any existing modal
-    const existingModal = document.getElementById('media-permissions-modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
-    // Get the DCV display element - append to it so it's visible in fullscreen
-    const dcvDisplay = document.getElementById('dcv-display');
-    if (!dcvDisplay) {
-        console.error("DCV display element not found");
-        return;
-    }
-
-    // Create modal overlay
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'media-permissions-modal';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.85);
-        z-index: 99999;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-family: Arial, sans-serif;
-        pointer-events: auto;
-    `;
-    
-    // Prevent clicks and mouse events on overlay from passing through to DCV
-    modalOverlay.onclick = (e) => {
-        e.stopPropagation();
-    };
-    modalOverlay.onmousedown = (e) => {
-        e.stopPropagation();
-    };
-    modalOverlay.onmouseup = (e) => {
-        e.stopPropagation();
-    };
-
-    // Create modal content
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-        background: white;
-        padding: 40px;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        max-width: 500px;
-        width: 90%;
-        text-align: center;
-    `;
-    
-    // Prevent clicks and mouse events on modal content from passing through
-    modalContent.onclick = (e) => {
-        e.stopPropagation();
-    };
-    modalContent.onmousedown = (e) => {
-        e.stopPropagation();
-    };
-    modalContent.onmouseup = (e) => {
-        e.stopPropagation();
-    };
-
-    const title = document.createElement('h2');
-    title.textContent = 'Media Permissions Required';
-    title.style.cssText = 'margin: 0 0 20px 0; color: #333; font-size: 24px;';
-
-    const description = document.createElement('p');
-    description.textContent = 'Please enable your microphone and webcam to continue.';
-    description.style.cssText = 'margin: 0 0 30px 0; color: #666; font-size: 16px;';
-
-    // Status indicators
-    const statusContainer = document.createElement('div');
-    statusContainer.style.cssText = 'margin: 20px 0; display: flex; flex-direction: column; gap: 15px;';
-
-    const webcamStatus = document.createElement('div');
-    webcamStatus.id = 'webcam-status';
-    webcamStatus.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f5f5f5; border-radius: 6px;';
-
-    const micStatus = document.createElement('div');
-    micStatus.id = 'mic-status';
-    micStatus.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f5f5f5; border-radius: 6px;';
-
-    // Webcam status
-    const webcamLabel = document.createElement('span');
-    webcamLabel.textContent = 'Webcam:';
-    webcamLabel.style.cssText = 'font-weight: bold; color: #333;';
-
-    const webcamIndicator = document.createElement('span');
-    webcamIndicator.id = 'webcam-indicator';
-    webcamIndicator.textContent = 'Not Enabled';
-    webcamIndicator.style.cssText = 'color: #d9534f; font-weight: bold;';
-
-    webcamStatus.appendChild(webcamLabel);
-    webcamStatus.appendChild(webcamIndicator);
-
-    // Mic status
-    const micLabel = document.createElement('span');
-    micLabel.textContent = 'Microphone:';
-    micLabel.style.cssText = 'font-weight: bold; color: #333;';
-
-    const micIndicator = document.createElement('span');
-    micIndicator.id = 'mic-indicator';
-    micIndicator.textContent = 'Not Enabled';
-    micIndicator.style.cssText = 'color: #d9534f; font-weight: bold;';
-
-    micStatus.appendChild(micLabel);
-    micStatus.appendChild(micIndicator);
-
-    statusContainer.appendChild(webcamStatus);
-    statusContainer.appendChild(micStatus);
-
-    // Buttons container
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.style.cssText = 'display: flex; gap: 10px; justify-content: center; margin-top: 30px;';
-
-    const enableWebcamBtn = document.createElement('button');
-    enableWebcamBtn.id = 'modal-enable-webcam';
-    enableWebcamBtn.textContent = 'Enable Webcam';
-    enableWebcamBtn.style.cssText = `
-        padding: 12px 24px;
-        font-size: 16px;
-        background: #5cb85c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-    `;
-
-    const enableMicBtn = document.createElement('button');
-    enableMicBtn.id = 'modal-enable-mic';
-    enableMicBtn.textContent = 'Enable Microphone';
-    enableMicBtn.style.cssText = `
-        padding: 12px 24px;
-        font-size: 16px;
-        background: #5cb85c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-    `;
-
-    buttonsContainer.appendChild(enableWebcamBtn);
-    buttonsContainer.appendChild(enableMicBtn);
-
-    // Continue button (disabled until both enabled)
-    const continueBtn = document.createElement('button');
-    continueBtn.id = 'modal-continue';
-    continueBtn.textContent = 'Continue';
-    continueBtn.disabled = true;
-    continueBtn.style.cssText = `
-        padding: 14px 40px;
-        font-size: 18px;
-        background: #5cb85c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-        margin-top: 20px;
-        width: 100%;
-        opacity: 0.5;
-        cursor: not-allowed;
-    `;
-
-    // State tracking
-    let webcamEnabled = false;
-    let micEnabled = false;
-
-    function updateContinueButton() {
-        if (webcamEnabled && micEnabled) {
-            continueBtn.disabled = false;
-            continueBtn.style.opacity = '1';
-            continueBtn.style.cursor = 'pointer';
-            continueBtn.style.background = '#5cb85c';
-        } else {
-            continueBtn.disabled = true;
-            continueBtn.style.opacity = '0.5';
-            continueBtn.style.cursor = 'not-allowed';
-        }
-    }
-
-    // Enable webcam handler
-    enableWebcamBtn.onclick = (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        enableWebcamBtn.disabled = true;
-        enableWebcamBtn.textContent = 'Enabling...';
-        connection.setWebcam(true)
-            .then(() => {
-                webcamEnabled = true;
-                webcamIndicator.textContent = 'Enabled';
-                webcamIndicator.style.color = '#5cb85c';
-                enableWebcamBtn.textContent = 'Webcam Enabled';
-                enableWebcamBtn.style.background = '#5cb85c';
-                enableWebcamBtn.disabled = true;
-                updateContinueButton();
-                setupWebcamButton(connection, true);
-            })
-            .catch(e => {
-                console.error("Failed to enable webcam:", e.message);
-                enableWebcamBtn.disabled = false;
-                enableWebcamBtn.textContent = 'Enable Webcam';
-                alert('Failed to enable webcam. Please check your browser permissions.');
-            });
-    };
-
-    // Enable mic handler
-    enableMicBtn.onclick = (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        enableMicBtn.disabled = true;
-        enableMicBtn.textContent = 'Enabling...';
-        connection.setMicrophone(true)
-            .then(() => {
-                micEnabled = true;
-                micIndicator.textContent = 'Enabled';
-                micIndicator.style.color = '#5cb85c';
-                enableMicBtn.textContent = 'Microphone Enabled';
-                enableMicBtn.style.background = '#5cb85c';
-                enableMicBtn.disabled = true;
-                updateContinueButton();
-                setupMicButton(connection, true);
-            })
-            .catch(e => {
-                console.error("Failed to enable microphone:", e.message);
-                enableMicBtn.disabled = false;
-                enableMicBtn.textContent = 'Enable Microphone';
-                alert('Failed to enable microphone. Please check your browser permissions.');
-            });
-    };
-
-    // Continue handler
-    continueBtn.onclick = (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        if (webcamEnabled && micEnabled) {
-            modalOverlay.remove();
-            // Buttons are already visible from when modal appeared
-        }
-    };
-
-    // Assemble modal
-    modalContent.appendChild(title);
-    modalContent.appendChild(description);
-    modalContent.appendChild(statusContainer);
-    modalContent.appendChild(buttonsContainer);
-    modalContent.appendChild(continueBtn);
-    modalOverlay.appendChild(modalContent);
-    
-    // Append to DCV display element so it's visible in fullscreen mode
-    dcvDisplay.appendChild(modalOverlay);
-    
-    // Create buttons when modal appears (if they don't exist)
-    createMediaButtons();
-    
-    // Force a reflow to ensure the modal is rendered
-    void modalOverlay.offsetHeight;
-    
-    console.log("Media permissions modal displayed");
 }
 
 // -----------------------------------------------------------------
